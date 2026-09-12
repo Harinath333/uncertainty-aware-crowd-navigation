@@ -89,12 +89,17 @@ class CrowdNavPredInterfaceMultiEnv(object):
             + obs_traj_rel*loss_mask_rel_obs.unsqueeze(2)
         v_obs, A_obs = seq_to_graph(obs_traj, obs_traj_rel, attn_mech='rel_conv')
         # *** Perform trajectory prediction
-        sampling = False
+        sampling = True
         with torch.no_grad():
             v_obs, A_obs, attn_mask_obs, loss_mask_rel = \
                 v_obs.to(self.device), A_obs.to(self.device), attn_mask_obs.to(self.device), loss_mask_rel.to(self.device)
-            results = self.model(v_obs, A_obs, attn_mask_obs, loss_mask_rel, tau=0.03, hard=True, sampling=sampling, device=self.device)
+            results = self.model(v_obs, A_obs, attn_mask_obs, loss_mask_rel, tau=0.03, hard=True, sampling=sampling, device=self.device, num_samples=5)
             gaussian_params_pred, x_sample_pred, info = results
+            # Store multiple trajectory samples for the navigation environment
+            self.last_multiple_samples = info.get("x_sample_pred_multiple", None)
+
+            if self.last_multiple_samples is not None:
+                print("Stored multiple samples:", self.last_multiple_samples.shape)
         mu, sx, sy, corr = gaussian_params_pred
         mu = mu.cumsum(1)
         sx_squared = sx**2.

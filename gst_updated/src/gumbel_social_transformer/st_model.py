@@ -242,6 +242,26 @@ class st_model(nn.Module):
             sample = mu
         return sample
 
+    def sample_gaussian_multiple(self, gaussian_params, num_samples=5,
+                                 device='cuda:0', detach_sample=False,
+                                 sampling=True):
+        """Generate multiple trajectory samples from the same Gaussian distribution.
+
+        Returns:
+            samples: (num_samples, batch, time, node, 2)
+        """
+        samples = []
+
+        for _ in range(num_samples):
+            sample = self.sample_gaussian(
+                gaussian_params,
+                device=device,
+                detach_sample=detach_sample,
+                sampling=sampling
+            )
+            samples.append(sample)
+
+        return torch.stack(samples, dim=0)
 
     def edge_evolution(self, xt_plus, At, device='cuda:0'):
         """
@@ -268,7 +288,7 @@ class st_model(nn.Module):
         At_plus = At + (xt_plus.unsqueeze(3) - xt_plus.unsqueeze(2))
         return At_plus
 
-    def forward(self, x, A, attn_mask, loss_mask_rel, tau=1., hard=False, sampling=True, device='cuda:0'):
+    def forward(self, x, A, attn_mask, loss_mask_rel, tau=1., hard=False, sampling=True, device='cuda:0', num_samples=1):
         """
         Forward function.
         inputs:
@@ -447,6 +467,28 @@ class st_model(nn.Module):
                 info['loss_mask_rel_full_partial'] = loss_mask_rel_full_partial # (batch, num_peds)
                 info['loss_mask_per_pedestrian'] = loss_mask_per_pedestrian # (batch, num_peds)
                 # pack results
+                if num_samples > 1:
+                    # Each prediction is a displacement:
+                    # [num_samples, batch, pred_seq_len, num_peds, 2]
+                    x_sample_pred_multiple = self.sample_gaussian_multiple(
+                        gaussian_params_pred,
+                        num_samples=num_samples,
+                        device=device,
+                        detach_sample=self.args.detach_sample,
+                        sampling=sampling
+                    )
+
+                # Convert predicted displacements into cumulative future positions.
+                # This is required because the renderer needs a path:
+                # position_t = displacement_1 + ... + displacement_t
+                x_position_pred_multiple = torch.cumsum(
+                    x_sample_pred_multiple,
+                    dim=2
+                )
+
+                # Preserve the same shape:
+                # [num_samples, batch, pred_seq_len, num_peds, 2]
+                info['x_sample_pred_multiple'] = x_position_pred_multiple
                 results = (gaussian_params_pred, x_sample_pred, info)
                 return results
             else:

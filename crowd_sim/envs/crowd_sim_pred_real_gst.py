@@ -22,6 +22,7 @@ class CrowdSimPredRealGST(CrowdSimPred):
 
         # to receive data from gst pred model
         self.gst_out_traj = None
+        self.gst_out_traj_multiple = None
 
 
     def set_robot(self, robot):
@@ -63,12 +64,52 @@ class CrowdSimPredRealGST(CrowdSimPred):
 
     def talk2Env(self, data):
         """
-        Call this function when you want extra information to send to/recv from the env
-        :param data: data that is sent from gst_predictor network to the env, it has 2 parts:
-        output predicted traj and output masks
-        :return: True means received
+        Receive prediction data from the GST predictor.
+
+        Expected:
+            trajectory:
+                [num_envs, num_humans, prediction_steps, 2]
+
+            multiple_trajectories:
+                [num_hypotheses, num_envs, num_humans, prediction_steps, 2]
         """
-        self.gst_out_traj=data
+
+        if not isinstance(data, dict):
+            raise TypeError(
+                "talk2Env expected a dictionary containing "
+                "'trajectory' and 'multiple_trajectories'"
+            )
+
+        self.gst_out_traj = data.get("trajectory", None)
+        self.gst_out_traj_multiple = data.get(
+            "multiple_trajectories",
+            None
+        )
+
+        print("\n========== talk2Env DEBUG ==========")
+
+        if self.gst_out_traj is not None:
+            print(
+                "Single trajectory:",
+                np.asarray(self.gst_out_traj).shape
+            )
+        else:
+            print("Single trajectory: None")
+
+        if self.gst_out_traj_multiple is not None:
+            self.gst_out_traj_multiple = np.asarray(
+                self.gst_out_traj_multiple
+            )
+
+            print(
+                "Multiple trajectories:",
+                self.gst_out_traj_multiple.shape
+            )
+        else:
+            print("Multiple trajectories: None")
+
+        print("====================================\n")
+
         return True
 
 
@@ -222,21 +263,250 @@ class CrowdSimPredRealGST(CrowdSimPred):
                 # plt.text(self.humans[i].px - 0.1, self.humans[i].py - 0.1, str(self.humans[i].id), color='black', fontsize=12)
                 plt.text(self.humans[i].px , self.humans[i].py , i, color='black', fontsize=12)
 
-        # plot predicted human positions
-        for i in range(len(self.humans)):
-            # add future predicted positions of each human
-            if self.gst_out_traj is not None:
-                for j in range(self.predict_steps):
-                    circle = plt.Circle(self.gst_out_traj[i, (2 * j):(2 * j + 2)] + np.array([robotX, robotY]),
-                                        self.config.humans.radius, fill=False, color='tab:orange', linewidth=1.5)
-                    # circle = plt.Circle(np.array([robotX, robotY]),
-                    #                     self.humans[i].radius, fill=False)
-                    ax.add_artist(circle)
-                    artists.append(circle)
+        # ==============================================================
+        # RENDER MULTIPLE GST TRAJECTORIES
+        #
+        # Shape:
+        # [num_hypotheses, batch, prediction_steps, num_humans, 2]
+        #
+        # Example:
+        # [5, 1, 5, 20, 2]
+        # ==============================================================
+
+        if self.gst_out_traj_multiple is not None:
+
+            multiple_traj = self.gst_out_traj_multiple
+
+            if hasattr(multiple_traj, "detach"):
+                multiple_traj = multiple_traj.detach().cpu().numpy()
+            else:
+                multiple_traj = np.asarray(multiple_traj)
+
+            print(
+                "RENDER USING MULTIPLE TRAJECTORIES:",
+                multiple_traj.shape
+            )
+
+            # Convert [H, N, T, 2] to [H, 1, N, T, 2] if necessary.
+            if multiple_traj.ndim == 4:
+                multiple_traj = multiple_traj[:, np.newaxis, ...]
+
+            if multiple_traj.ndim != 5:
+                print(
+                    "Invalid multiple trajectory shape:",
+                    multiple_traj.shape
+                )
+
+            else:
+
+                num_hypotheses = multiple_traj.shape[0]
+                env_index = 0
+
+                # ----------------------------------------------------------
+                # Calculate the humans currently inside the robot attention
+                # radius. These are the only humans we will render.
+                # ----------------------------------------------------------
+
+                attention_radius = getattr(
+                self.config.env,
+                "circle_radius",
+                getattr(self.config.robot, "sensor_range", 6.0)
+            )
+
+                visible_human_indices = []
+
+                for human_index, human in enumerate(self.humans):
+
+                    distance_from_robot = np.linalg.norm(
+                        np.array([
+                            human.px - robotX,
+                            human.py - robotY
+                        ])
+                    )
+
+                    if distance_from_robot <= attention_radius:
+                        visible_human_indices.append(human_index)
+
+                print(
+                    "Humans inside sensor range:",
+                    visible_human_indices
+                )
+
+                # ----------------------------------------------------------
+                # One fixed color for each hypothesis.
+                # ----------------------------------------------------------
+
+                hypothesis_colors = [
+                    "cyan",
+                    "lime",
+                    "magenta",
+                    "gold",
+                    "deepskyblue",
+                ]
+
+                # ----------------------------------------------------------
+                # Draw each hypothesis for every visible human.
+                #
+                # IMPORTANT:
+                # The prediction tensor contains all 20 humans.
+                # Therefore use:
+                #
+                # hypothesis[:, human_index, :]
+                #
+                # NOT:
+                #
+                # hypothesis[:, prediction_slot, :]
+                # ----------------------------------------------------------
+
+                for hypothesis_index in range(num_hypotheses):
+
+                    # Shape:
+                    # [prediction_steps, num_humans, 2]
+                    hypothesis = multiple_traj[
+                        hypothesis_index,
+                        env_index
+                    ]
+
+                    color = hypothesis_colors[
+                        hypothesis_index % len(hypothesis_colors)
+                    ]
+
+                    for human_index in visible_human_indices:
+
+                        # Safety check.
+                        if human_index >= hypothesis.shape[1]:
+                            continue
+
+                        # Shape:
+                        # [prediction_steps, 2]
+                        human_prediction = hypothesis[
+                            :,
+                            human_index,
+                            :
+                        ]
+
+                        human_prediction = np.asarray(
+                            human_prediction,
+                            dtype=np.float32
+                        )
+
+                        # Remove invalid values.
+                        valid_mask = np.isfinite(
+                            human_prediction
+                        ).all(axis=1)
+
+                        human_prediction = human_prediction[
+                            valid_mask
+                        ]
+
+                        if human_prediction.shape[0] < 2:
+                            continue
+
+                        human = self.humans[human_index]
+
+                        # GST predictions are relative to the current
+                        # human position, so convert them to world coordinates.
+                        human_start = np.array([
+                            human.px,
+                            human.py
+                        ])
+
+                        world_trajectory = (
+                            human_prediction + human_start
+                        )
+
+                        # Draw the connected predicted path.
+                        path_line, = ax.plot(
+                            world_trajectory[:, 0],
+                            world_trajectory[:, 1],
+                            color=color,
+                            linewidth=1.8,
+                            linestyle="-",
+                            marker="o",
+                            markersize=2.5,
+                            alpha=0.9,
+                            zorder=20
+                        )
+
+                        artists.append(path_line)
+
+                        # Draw small future position markers.
+                        for step in range(
+                            world_trajectory.shape[0]
+                        ):
+
+                            future_circle = plt.Circle(
+                                (
+                                    world_trajectory[step, 0],
+                                    world_trajectory[step, 1]
+                                ),
+                                self.config.humans.radius * 0.35,
+                                fill=False,
+                                color=color,
+                                linewidth=0.8,
+                                alpha=0.35,
+                                zorder=19
+                            )
+
+                            ax.add_artist(future_circle)
+                            artists.append(future_circle)
+
+        # ==============================================================
+        # SINGLE TRAJECTORY FALLBACK
+        # ==============================================================
+
+        elif self.gst_out_traj is not None:
+
+            print("RENDER USING SINGLE ORANGE TRAJECTORY")
+
+            single_traj = np.asarray(self.gst_out_traj)
+
+            if single_traj.ndim == 4:
+                single_traj = single_traj[0]
+
+            for human_index in range(
+                min(len(self.humans), single_traj.shape[0])
+            ):
+
+                prediction = single_traj[human_index]
+
+                if prediction.ndim == 1:
+                    prediction = prediction.reshape(-1, 2)
+
+                world_trajectory = (
+                    prediction[:, :2]
+                    + np.array([robotX, robotY])
+                )
+
+                line, = ax.plot(
+                    world_trajectory[:, 0],
+                    world_trajectory[:, 1],
+                    color="orange",
+                    linewidth=3,
+                    marker="o",
+                    markersize=3,
+                    zorder=50
+                )
+
+                artists.append(line)
+
+        else:
+            print(
+                "NO PREDICTED TRAJECTORY AVAILABLE DURING RENDER"
+            )
 
         plt.pause(0.1)
+
         for item in artists:
-            item.remove() # there should be a better way to do this. For example,
-            # initially use add_artist and draw_artist later on
-        for t in ax.texts:
-            t.set_visible(False)
+            try:
+                item.remove()
+            except ValueError:
+                pass
+
+        # Remove only temporary text created by this frame.
+        for text_item in list(ax.texts):
+            try:
+                text_item.remove()
+            except ValueError:
+                pass
+

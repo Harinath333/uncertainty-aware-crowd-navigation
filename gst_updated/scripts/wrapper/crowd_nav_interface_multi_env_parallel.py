@@ -1,4 +1,8 @@
-from gst_updated.scripts.data import pathhack
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+
 import pickle
 from os.path import join, isdir
 import torch
@@ -143,8 +147,12 @@ class CrowdNavPredInterfaceMultiEnv(object):
             b_v_obs, b_A_obs, b_attn_mask_obs_tensor, b_loss_mask_rel = \
                 b_v_obs.to(self.device), b_A_obs.to(self.device), \
                 b_attn_mask_obs_tensor.float().to(self.device), b_loss_mask_rel.float().to(self.device)
-            results = self.model(b_v_obs, b_A_obs, b_attn_mask_obs_tensor, b_loss_mask_rel, tau=0.03, hard=True, sampling=sampling, device=self.device)
+            results = self.model(b_v_obs, b_A_obs, b_attn_mask_obs_tensor, b_loss_mask_rel, tau=0.03, hard=True, sampling=sampling, device=self.device, num_samples=5)
             gaussian_params_pred, x_sample_pred, info = results
+            x_sample_pred_multiple = info.get("x_sample_pred_multiple", None)
+
+            if x_sample_pred_multiple is not None:
+                print("Multiple prediction samples shape:", x_sample_pred_multiple.shape)
         mu, sx, sy, corr = gaussian_params_pred
         # print(mu.shape) # torch.Size([1, 5, 48, 2])
         # print(sx.shape)

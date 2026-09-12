@@ -84,6 +84,9 @@ def inference(loader, model, args, mode='val', tau=1., device='cuda:0'):
                 for _ in range(20):
                     results = model(v_obs, A_obs, attn_mask_obs, loss_mask_rel, tau=tau, hard=True, sampling=sampling, device=device)
                     gaussian_params_pred, x_sample_pred, info = results
+                    if 'x_sample_pred_multiple' in info:
+                        print('Multiple trajectory samples:', info['x_sample_pred_multiple'].shape)
+                        break
                     loss_mask_per_pedestrian = info['loss_mask_per_pedestrian']
                     loss_mask_rel_full_partial = info['loss_mask_rel_full_partial']
                     loss_mask_rel_pred = loss_mask_rel[:,:,-args.pred_seq_len:]
@@ -157,4 +160,6 @@ if __name__ == "__main__":
     # main(args)
     from crowd_nav.configs.config import Config
     config = Config()
+    config.pred.random_seed = 1000
+    config.pred.dataset = 'sj'
     main(config.pred)

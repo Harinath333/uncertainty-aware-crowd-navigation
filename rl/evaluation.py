@@ -76,10 +76,44 @@ def evaluate(actor_critic, eval_envs, num_processes, device, test_size, logging,
 
             # if the vec_pretext_normalize.py wrapper is used, send the predicted traj to env
             if args.env_name == 'CrowdSimPredRealGST-v0' and config.env.use_wrapper:
-                out_pred = obs['spatial_edges'][:, :, 2:].to('cpu').numpy()
-                # send manager action to all processes
-                ack = eval_envs.talk2Env(out_pred)
-                assert all(ack)
+
+                out_pred = (
+                obs['spatial_edges'][:, :, 2:]
+                .detach()
+                .cpu()
+                .numpy()
+            )
+
+            multiple_pred = getattr(
+                eval_envs,
+                'multiple_out_traj',
+                None
+            )
+
+            if multiple_pred is not None:
+                multiple_pred = (
+                    multiple_pred
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
+
+            talk_data = {
+                'trajectory': out_pred,
+                'multiple_trajectories': multiple_pred
+            }
+
+            print(
+                'Evaluation sending multiple trajectories:',
+                None if multiple_pred is None else multiple_pred.shape
+            )
+
+            # IMPORTANT:
+            # talk2Env_async() later accesses data[0],
+            # so send a list containing the dictionary.
+            ack = eval_envs.talk2Env([talk_data])
+
+            assert all(ack)
             # render
             if visualize:
                 eval_envs.render()
