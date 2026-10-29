@@ -18,7 +18,7 @@ class Config(object):
     env.time_limit = 50
     env.time_step = 0.25
     env.val_size = 100
-    env.test_size = 500
+    env.test_size = 10
     # if randomize human behaviors, set to True, else set to False
     env.randomize_attributes = True
     env.num_processes = args.num_processes
@@ -110,7 +110,7 @@ class Config(object):
     # action space of the robot
     action_space = BaseConfig()
     # holonomic or unicycle
-    action_space.kinematics = "unicycle"
+    action_space.kinematics = "holonomic"
 
     # config for ORCA
     orca = BaseConfig()

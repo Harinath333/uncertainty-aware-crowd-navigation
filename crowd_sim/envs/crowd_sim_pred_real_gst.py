@@ -331,7 +331,7 @@ class CrowdSimPredRealGST(CrowdSimPred):
                     "Humans inside sensor range:",
                     visible_human_indices
                 )
-
+                
                 # ----------------------------------------------------------
                 # One fixed color for each hypothesis.
                 # ----------------------------------------------------------

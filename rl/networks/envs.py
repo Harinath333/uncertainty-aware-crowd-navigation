@@ -112,7 +112,7 @@ def make_vec_envs(env_name,
     test = False if len(envs) > 1 else True
 
     if len(envs) > 1:
-        envs = ShmemVecEnv(envs, context='fork')
+        envs = ShmemVecEnv(envs, context='spawn')
     else:
         envs = DummyVecEnv(envs)
     # for collect data in supervised learning, we don't need to wrap pytorch

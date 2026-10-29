@@ -109,7 +109,7 @@ def main():
 
 
 	# allow the usage of multiple GPUs to increase the number of examples processed simultaneously
-	nn.DataParallel(actor_critic).to(device)
+	actor_critic = actor_critic.to(device)
 
 	# create the ppo optimizer
 	agent = ppo.PPO(
@@ -164,17 +164,18 @@ def main():
 					rollouts.masks[step])
 
 			# if we use real prediction, send predictions to env for rendering
-			if env_name == 'CrowdSimPredRealGST-v0' and env_config.env.use_wrapper:
+			#if env_name == 'CrowdSimPredRealGST-v0' and env_config.env.use_wrapper:
 				# [nenv, max_human_num, 2*(pred_steps+1)] -> [nenv, max_human_num, 2*pred_steps]
-				out_pred = rollouts_obs['spatial_edges'][:, :, 2:].to('cpu').numpy()
+				#out_pred = rollouts_obs['spatial_edges'][:, :, 2:].to('cpu').numpy()
 				# send manager action to all processes
-				ack = envs.talk2Env(out_pred)
-				assert all(ack)
+				#ack = envs.talk2Env(out_pred)
+				#assert all(ack)
 
-			if config.sim.render:
-				envs.render()
 			# Obser reward and next obs
 			obs, reward, done, infos = envs.step(action)
+			if config.sim.render:
+							envs.render()
+
 
 
 			for info in infos:
