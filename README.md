@@ -17,6 +17,7 @@ Predicting pedestrian movement is an important part of safe robot navigation in 
 - **Risk-Aware Reward Shaping:** Adds an intrusion-risk penalty to the existing prediction-aware PPO reward.
 - **Ablation Study:** Compares the original GST-PPO baseline, the multi-hypothesis extension, and the complete risk-aware method.
 - **Simulation-Based Evaluation:** Evaluates navigation performance using the PyTorch-based CrowdSim environment.
+
 ## Requirements
 
 The project uses the following technologies:
@@ -107,6 +108,10 @@ For repositories using `test.py`, the command may be:
 ```bash
 python test.py
 ```
+Note that the `config.py` and `arguments.py` in the testing folder will be loaded, instead of those in the root directory.  
+The testing results are logged in `trained_models/your_output_dir/test/` folder, and are also printed on terminal.  
+If you set `visualize=True` in `test.py`, you will be able to see visualizations like this:  
+<img src="/figures/visual.gif" width="420" />
 
 Configure the test environment, checkpoint path, number of episodes, and visualization settings before running the evaluation.
 
@@ -187,7 +192,4 @@ Other contributors:
 
 This project is intended for research and educational purposes. Performance observed in simulation does not guarantee equivalent performance in real-world environments. Real-world deployment requires additional testing, safety evaluation, and validation.
 
-The reported results correspond to the specified experimental setup and should not be assumed to generalize to other environments without further evaluation. 
-
-## Contact
-If you have any questions or find any bugs, please feel free to open an issue or pull request.
+The reported results correspond to the specified experimental setup and should not be assumed to generalize to other environments without further evaluation.
