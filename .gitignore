@@ -1,12 +1,74 @@
+# ==========================================
+# Datasets
+# ==========================================
 gst_datasets/
-gst_updated/scripts/data
-trained_models/
-.idea/
-venv/
-*.pyc 
-*__pycache__*
 
+# ==========================================
+# Python cache and compiled files
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ==========================================
+# Virtual environments
+# ==========================================
+venv/
+.venv/
+env/
+
+# ==========================================
+# Environment variables and secrets
+# ==========================================
+.env
+.env.*
+!.env.example
+
+# ==========================================
+# IDE and editor files
+# ==========================================
+.idea/
+.vscode/
+
+# ==========================================
+# Logs and TensorBoard event files
+# ==========================================
+*.log
+events.out.tfevents.*
+
+# ==========================================
+# Temporary experiment scripts
+# ==========================================
 train1.py
 test1.py
 test2.py
 check_env.py
+
+# ==========================================
+# Operating system files
+# ==========================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==========================================
+# Local experiment data
+# ==========================================
+gst_updated/scripts/data/
+
+# TensorBoard event logs
+gst_updated/results/**/events.out.tfevents.*
+
+# Python experiment logs
+*.log
+
+# Temporary Python files
+*.tmp
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Ignore TensorBoard event logs in all directories
+**/events.out.tfevents.*
